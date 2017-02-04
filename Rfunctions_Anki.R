@@ -33,21 +33,25 @@ anki <- data.frame(name = "", package = "", summary = "", description = "",
 
 pos <- 0
 
-anki_cards <- function(pkgs) {
-    # Input packages desired to convert documentation to Anki cards
-    # Arguments:
+
+pkgs <- c("base", "dplyr", "ggplot", "utils")
+
+pkg_fxns <- function(pkg_paths) {
+    # Returns path to function documentation for specified packages
     #   pkgs: names of packages to convert to Anki cards (character vector)
     
-    for (i in c(4, 28, 43, 71)) { #seq_along(pkg_paths)
+    for (i in pkgs) { #seq_along(pkg_paths)
         # open pkg parent html
-        pkg_html <- read_html(paste(connection, pkg_path[i], pkg_index_file, sep = ""))
+        pkg_html <- read_html(paste("http://127.0.0.1:11435/", pkg_paths[i],
+                                    "00Index.html", sep = ""))
         
         # list path for all functions within given package
-        fxn_selector <- "td a"
+        fxn_selector <- "td a" # maybe add :nth-child(n+1) to avoid overall pkg man
         fxn_paths <- html_nodes(pkg_html, fxn_selector) %>%
             html_attr('href')
         fxn_names <- sub("(^.*)(.html$)", "\\1", fxn_paths)
-        
+    }
+    
         for (j in seq_along(fxn_paths)) {
             if (fxn_names[j] == pkg_names[i]) {
                 next
