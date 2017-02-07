@@ -1,5 +1,15 @@
-# Automatically add man pages for functions from specified package
-# Packages are located in /Library/Frameworks/R.framework/Versions/3.3/Resources/library/
+# Automatically add man pages for functions from specified packages
+
+# (Potentially) Useful resources:
+# https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Processing-documentation-files
+# https://stat.ethz.ch/R-manual/R-devel/library/base/html/RdUtils.html
+# https://www.r-project.org/help.html
+
+# All packages are located in this directory:
+#   "file:///Library/Frameworks/R.framework/Versions/3.3/Resources/library/"
+# Index of functions for each package is located in:
+#   ".../library/<pkg name>/html/00index.html
+# Function man pages are NOT located in this directory
 
 # To do:
 #   1. Find location & format of pkg man pages
@@ -13,10 +23,23 @@
 library(rvest)
 
 # computer connection to open html (not sure what this is exactly)
-connection <- "http://127.0.0.1:11435/"
+#connection <- "http://127.0.0.1:11435/"
+connection <- "http://127.0.0.1:15288/"
 
 # html listing all packages
 Rpkg_index <- "doc/html/packages.html"
+
+# R index html
+"file:///Library/Frameworks/R.framework/Versions/3.3/Resources/doc/html/packages.html"
+    # only includes standard packages
+
+# base pkg
+"file:///Library/Frameworks/R.framework/Versions/3.3/Resources/library/base/html/00Index.html"
+
+# dplyr pkg
+"file:///Library/Frameworks/R.framework/Versions/3.3/Resources/library/dplyr/html/00Index.html"
+
+
 Rpkg_selector <- "td a"
 Rpkg_index_html <- read_html(paste(connection, Rpkg_index, sep = ""))
 
@@ -72,8 +95,16 @@ pkg_fxns <- function(pkg_paths) {
             #description_start <- grep("Description", fxn_info) + 2
             #description <- fxn_info[grep("Description", fxn_info) + 2]
         }
-    }
-    
+}
+extract_Rfunction_doc <- function(html_man) {
+    anki$name <- fxn_names
+    anki$package <- pkg_names[i]
+    anki$summary <- html_nodes(fxn_html, "h2") %>%
+        html_text()
+    anki$description <- html_nodes(fxn_html, "p:nth-child(4)") %>%
+        html_text()
+    anki$usage <- as.character(html_nodes(fxn_html, "pre:first-of-type"))
+    anki$arguments <- as.character(html_nodes(fxn_html, "[summary='R argblock']"))
     # post-processing
     #   tables
     #       1. replace "\n" with " "; some may need to be replaced with "<br>"
@@ -84,3 +115,9 @@ pkg_fxns <- function(pkg_paths) {
     # export as txt for Anki
     # Anki can import html if it is in a plain txt format 
     # anki_dir <- "/Users/jbaron/Library/Application Support/Anki2"
+    
+    paths <- unique(paths)
+    attributes(paths) <- list(call = match.call(), topic = topic, 
+                              tried_all_packages = tried_all_packages, type = help_type)
+    class(paths) <- "help_files_with_topic"
+    paths
