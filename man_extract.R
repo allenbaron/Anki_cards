@@ -10,13 +10,17 @@ man_extract <- function(function_name, package = NULL, ...,
     #   fields = heading names of content from man page to extract
     #       (correct capitalization necessary)
     
-    # test for required packages and load
+    # test for required packages and install/load, as necessary
     req_pkgs <- c("rvest", "xml2", "magrittr")
-    if (!all(req_pkgs %in% installed.packages()[,"Package"])) {
-        stop("required pkgs (rvest, xml2, magrittr) must be installed!")
+    pkgs_installed <- basename(find.package(req_pkgs, quiet = TRUE))
+    new_pkgs <- req_pkgs[!(req_pkgs %in% pkgs_installed)]
+    if (length(new_pkgs)) {
+        install.packages(new_pkgs)
     }
-    library(rvest)
-    library(magrittr)
+    pkgs_to_attach <- req_pkgs[!req_pkgs %in% (.packages())]
+    for (i in pkgs_to_attach) {
+        library(i, character.only = TRUE)
+    }
     
     # load man page (e.g. help()) as html for desired function
     help_binding <- help(topic = eval(function_name), package = eval(package), ...)
