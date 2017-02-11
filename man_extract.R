@@ -4,8 +4,8 @@ man_extract <- function(function_name, package = NULL, ...,
     # as well as, the header info (function name, package name, and summary)
     # from the function man page
     # Arguments:
-    #   function_name = should be a name, length-one character vector or reserved word
-    #   package = name of package that function is in
+    #   function_name = length-one character vector
+    #   package = NULL or length-one character vector
     #   ... = other arguments passed to help()
     #   fields = heading names of content from man page to extract
     #       (correct capitalization necessary)
@@ -17,16 +17,6 @@ man_extract <- function(function_name, package = NULL, ...,
     }
     library(rvest)
     library(magrittr)
-    
-    # allow for variables as name or character
-    if (is.name(y <- substitute(function_name))) {
-        function_name <- as.character(y)
-    }
-    if (!missing(package)) {
-        if (is.name(y <- substitute(package))) {
-            package <- as.character(y)
-        }
-    }
     
     # load man page (e.g. help()) as html for desired function
     help_binding <- help(topic = eval(function_name), package = eval(package), ...)
