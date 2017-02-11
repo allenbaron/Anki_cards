@@ -1,5 +1,6 @@
 man_extract <- function(function_name, package = NULL, ...,
-                         fields = c("Description", "Usage", "Arguments")) {
+                        fields = c("Description", "Usage", "Arguments"),
+                        warn = TRUE) {
     # Extract the content (in html format) from the specified "fields",
     # as well as, the header info (function name, package name, and summary)
     # from the function man page
@@ -7,8 +8,10 @@ man_extract <- function(function_name, package = NULL, ...,
     #   function_name = length-one character vector
     #   package = NULL or length-one character vector
     #   ... = other arguments passed to help()
-    #   fields = heading names of content from man page to extract
-    #       (correct capitalization necessary)
+    #   fields = character vector; heading names of content from man page to 
+    #       extract (correct capitalization necessary)
+    #   warn = logical; whether to warn if a field does not exist
+    #       for specified function
     
     # test for required packages and install/load, as necessary
     req_pkgs <- c("rvest", "xml2", "magrittr")
@@ -23,7 +26,8 @@ man_extract <- function(function_name, package = NULL, ...,
     }
     
     # load man page (e.g. help()) as html for desired function
-    help_binding <- help(topic = eval(function_name), package = eval(package), ...)
+    help_binding <- help(topic = eval(function_name),
+                         package = eval(package), ...)
     if (length(help_binding) < 1 & is.null(package)) {
         stop(paste0("No documentation for ‘", function_name,
                     "’ in specified packages and libraries:",
@@ -46,22 +50,27 @@ man_extract <- function(function_name, package = NULL, ...,
     function_name <- basename(help_binding)
     pkg_name <- basename(dirname(dirname(help_binding)))
     summary <- html_nodes(help_html, "h2") %>%
-        html_text()
+        html_text() %>%
+        gsub("\n", "", .)
     h3_index <- grep("^<h3>", elements)
-    field_vals <- list(name = function_name, package = pkg_name,
-                       summary = summary)
+    field_vals <- data.frame(name = function_name, package = pkg_name,
+                       summary = summary, stringsAsFactors = FALSE)
     for (i in fields) {
         start <- grep(paste0("^<h3>", i), elements)
         if (length(start) != 1) {
-            warning(paste0("'", i, "' field not present on function man page"))
+            if (warn) {
+                warning(paste0("'", i, "' field not present on function man page"))
+            }
+            field_vals[[i]] <- NA
             next
         }
         end <- if (start == tail(h3_index, n = 1)) {
             length(elements) + 1
         } else {
-        end <- h3_index[which(h3_index %in% start) + 1]
+            h3_index[which(h3_index %in% start) + 1]
         }
-        field_vals[[i]] <- elements[(start + 1):(end - 1)]
+        field_vals[[i]] <- paste0(elements[(start + 1):(end - 1)],
+                                  collapse = "<br />")
     }
     field_vals
 }
