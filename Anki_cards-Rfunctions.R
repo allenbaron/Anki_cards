@@ -96,15 +96,78 @@ pkg_fxns <- function(pkg_paths) {
             #description <- fxn_info[grep("Description", fxn_info) + 2]
         }
 }
-extract_Rfunction_doc <- function(html_man) {
-    anki$name <- fxn_names
-    anki$package <- pkg_names[i]
-    anki$summary <- html_nodes(fxn_html, "h2") %>%
+
+
+help_binding <- help(topic = function_name) # need to get function name from list of package 00index.html
+    
+Rman_extract <- function(help_binding,
+                         fields = c("Description", "Usage", "Arguments")) {
+    # Extract the content (in html format) from the specified "fields", as well as,
+    # the header info (function name, package name, and summary) from the
+    # man page
+    # Arguments:
+    #   help_binding = e.g. x <- help(topic = "abbreviate")
+    
+    # test if required packages installed
+    req_pkgs <- c("rvest", "xml2", "magrittr")
+    if (!all(req_pkgs %in% installed.packages()[,"Package"])) {
+        stop("required pkgs (rvest, xml2, magrittr) must be installed!")
+    }
+    
+    library(rvest)
+    library(magrittr)
+    function_name <- basename(help_binding)
+    pkg_name <- basename(dirname(dirname(help_binding)))
+    
+    # reload man page as html for desired function
+    help_Rd <- utils:::.getHelpFile(help_binding)
+    tools::Rd2HTML(help_Rd, out = "temp.html")
+    help_html <- read_html("temp.html")
+    file.remove("temp.html")
+    
+    # remove non-html components
+    elements <- html_nodes(help_html, "h3, h3 ~ *") %>%
+        gsub("\n\n", "<br>", .) %>%
+        gsub("\n", " ", .) %>%
+        gsub('\"',"'", .)
+    
+    # extract help info from help_html for card
+    summary <- html_nodes(help_html, "h2") %>%
         html_text()
-    anki$description <- html_nodes(fxn_html, "p:nth-child(4)") %>%
+    h3_index <- grep("^<h3>", elements)
+    field_vals <- list(name = function_name, package = pkg_name,
+                       summary = summary)
+    for (i in fields) {
+        start <- grep(paste0("^<h3>", i), elements)
+        end <- h3_index[which(h3_index %in% start) + 1]
+        field_vals[[i]] <- elements[(start + 1):(end - 1)]
+    }
+    field_vals
+}
+
+x <- data.frame(x)
+
+    
+    #usage <- as.character(html_nodes(fxn_html, "pre:first-of-type"))
+    #anki$arguments <- as.character(html_nodes(fxn_html, "[summary='R argblock']"))
+    
+    t <- html_nodes(help_html, "h3, h3 ~ p, h3 ~ pre, [summary='R argblock']")
+
+    t1 <- html_nodes(help_html, "*")
+    t2 <- html_nodes(help_html, "h3, p, pre, [summary='R argblock']")
+    t3 <- html_nodes(help_html, "title") %>%
         html_text()
-    anki$usage <- as.character(html_nodes(fxn_html, "pre:first-of-type"))
-    anki$arguments <- as.character(html_nodes(fxn_html, "[summary='R argblock']"))
+    #title <- html_nodes(help_html, "[summary='page for abbreviate'] td:first-of-type") %>%
+    #    html_text()
+
+    #help_char <- readLines("temp.html")
+    
+    # extract help info from help_char for card
+    #start <- grep("<h3>Description", help_char) + 2
+    #start <- help_char[start:length(help_char)]
+    #details <- help_char[(grep("<p>", start)[1] + :grep("</p>", start)[1]
+    
+    
     # post-processing
     #   tables
     #       1. replace "\n" with " "; some may need to be replaced with "<br>"
@@ -115,9 +178,3 @@ extract_Rfunction_doc <- function(html_man) {
     # export as txt for Anki
     # Anki can import html if it is in a plain txt format 
     # anki_dir <- "/Users/jbaron/Library/Application Support/Anki2"
-    
-    paths <- unique(paths)
-    attributes(paths) <- list(call = match.call(), topic = topic, 
-                              tried_all_packages = tried_all_packages, type = help_type)
-    class(paths) <- "help_files_with_topic"
-    paths

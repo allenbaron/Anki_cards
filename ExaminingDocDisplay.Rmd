@@ -220,6 +220,12 @@ tools::Rd2HTML(page)
 
 Okay. I'll just extract the pertinent html info I want for Anki and I'll be set!
 
+** UPDATE: Feb 9, 2017 **
+I read in documentation ??`:::` that this syntax should not be used (except to examine an internal named argument), so I thought I'd examine what this does.
+
+I checked the source code for `utils:::.getHelpFile` and saw that it basically extracts the location of the help doc (input from `help()`) and then calls `tools:::fetchRdDB` (with `filebase = <pkg dir>` and `key = <fxn name>`). Looking at it's source code, it makes use of a custom function wrapping `lazyLoadDBfetch` and then `lazyLoadDBexec()` to execute that function in the `filebase` dir. The help for these functions specify they shouldn't be called either and are only meant for internal R use, so I'm just going to stick with what worked and not try to recreate these functions.
+
+
 ## Other approaches I attempted/am aware of
 
 1. While I was examining the attributes of `y` I also noticed info suggesting help files were opened with `browseURL()`. I tried using the path "/Library/Frameworks/R.framework/Resources/library/base/help/abbreviate"as an argument but nothing happened. Then, I thought maybe I could change the default browser to some output I could use so I examined `getOption("browser")` but I thought this was a long shot and didn't understand much since it appears to access precompiled code using `.Call` (see `?.Call`).
