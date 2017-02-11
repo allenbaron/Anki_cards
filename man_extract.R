@@ -18,7 +18,7 @@ man_extract <- function(function_name, package = NULL, ...,
     library(rvest)
     library(magrittr)
     
-    # allow for variables in name or character format
+    # allow for variables as name or character
     if (is.name(y <- substitute(function_name))) {
         function_name <- as.character(y)
     }
@@ -42,9 +42,11 @@ man_extract <- function(function_name, package = NULL, ...,
     
     # remove non-html components
     elements <- html_nodes(help_html, "h3, h3 ~ *") %>%
-        gsub("\n\n", "<br>", .) %>%
+        gsub("\n\n", "<br />", .) %>%
         gsub("\n", " ", .) %>%
-        gsub('\"',"'", .)
+        gsub('\"', "'", .) %>%
+        gsub("( {3,}|\t)", "<br />\\1", .) %>%
+        gsub("<pre> +", "<pre>", .)
     
     # extract html man content
     function_name <- basename(help_binding)
@@ -57,8 +59,7 @@ man_extract <- function(function_name, package = NULL, ...,
     for (i in fields) {
         start <- grep(paste0("^<h3>", i), elements)
         if (length(start) != 1) {
-            warning(paste0("'", i, "' field not present on function man page"),
-                    call. = FALSE)
+            warning(paste0("'", i, "' field not present on function man page"))
             next
         }
         end <- if (start == tail(h3_index, n = 1)) {
@@ -70,13 +71,3 @@ man_extract <- function(function_name, package = NULL, ...,
     }
     field_vals
 }
-
-z <- function(function_name) {
-    if (is.name(y <- substitute(function_name))) {
-        function_name <- as.character(y)
-    }
-    print(y)
-    print(function_name)
-    help(topic = eval(function_name))
-}
-    
