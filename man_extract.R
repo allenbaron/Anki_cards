@@ -70,7 +70,7 @@ man_extract <- function(function_name, package = NULL, ...,
             h3_index[which(h3_index %in% start) + 1]
         }
         field_vals[[i]] <- paste0(elements[(start + 1):(end - 1)],
-                                  collapse = "<br />")
+                                  collapse = " ")
     }
     field_vals
 }
