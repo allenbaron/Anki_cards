@@ -21,7 +21,7 @@ list_functions <- function(package) {
     pkg_html <- read_html(path)
     
     # list all functions within package
-    functions <- html_nodes(pkg_html, "td a") %>%
+    function_name <- html_nodes(pkg_html, "td a") %>%
             html_text()
-    data.frame(function_name = functions, package = package)
+    list(function_name = function_name, package = package)
 }
