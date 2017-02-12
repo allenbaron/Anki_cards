@@ -22,4 +22,5 @@ write.table(tidy_content, file = "tidyverse_cards.txt", sep = "\t",
     y <- tidy_content$name[duplicated(tidy_content$name)]
     tidy_content[tidy_content$name %in% y, 1:3]
 
+# packages not yet extracted
 other_pkgs <- c("graphics", "grDevices", "lubridate", "reshape2")
