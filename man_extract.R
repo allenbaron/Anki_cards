@@ -1,6 +1,6 @@
 man_extract <- function(function_name, package = NULL, ...,
                         fields = c("Description", "Usage", "Arguments"),
-                        warn = TRUE, silentError = FALSE) {
+                        warn = TRUE, programmatically = FALSE) {
     # Extract the content (in html format) from the specified "fields",
     # as well as, the header info (function name, package name, and summary)
     # from the function man page
@@ -11,10 +11,8 @@ man_extract <- function(function_name, package = NULL, ...,
     #   fields = character vector; heading names of content from man page to 
     #       extract (correct capitalization necessary)
     #   warn = logical; whether to warn if a field does not exist
-    #       for specified function
-    #   silentError = logical; if NO help file found and:
-    #       TRUE = return 'function_name', 'package', 'error' silently
-    #       FALSE = return error message
+    #       for the specified function
+    #   programmatically = logical; logs help() errors without exitting
     
     # test for required packages and install/load, as necessary
     req_pkgs <- c("rvest", "xml2", "magrittr")
@@ -32,14 +30,18 @@ man_extract <- function(function_name, package = NULL, ...,
     help_binding <- help(topic = eval(function_name),
                          package = eval(package), ...)
     if (length(help_binding) < 1) {
-        suggest <- if (is.null(package)) {
-            ";\n  TRY additional arguments to help()"
-            } else { NULL
+        if (is.null(package)) {
+            suggest <- ";\n  TRY additional arguments to help()"
+            pkg_name <- NA
+        } else {
+            suggest <- NULL
+            pkg_name <- package
             }
-        if (silentError) {
+        if (programmatically) {
             return(data.frame(name = function_name, package = pkg_name,
-                          error = paste0("No documentation for in specified ",
-                                         "packages and libraries", suggest)))
+                              summary = NA,
+                              as.list(setNames(rep(NA, length(fields)), fields)),
+                                      error = TRUE))
         } else {
             stop(paste0("No documentation for '", function_name,
                         "' in specified packages and libraries", suggest,
@@ -85,5 +87,6 @@ man_extract <- function(function_name, package = NULL, ...,
         field_vals[[i]] <- paste0(elements[(start + 1):(end - 1)],
                                   collapse = " ")
     }
+    field_vals$error <- FALSE
     field_vals
 }
