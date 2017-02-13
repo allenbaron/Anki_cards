@@ -1,6 +1,6 @@
 man_extract <- function(function_name, package = NULL, ...,
                         fields = c("Description", "Usage", "Arguments"),
-                        warn = TRUE) {
+                        warn = TRUE, silentError = FALSE) {
     # Extract the content (in html format) from the specified "fields",
     # as well as, the header info (function name, package name, and summary)
     # from the function man page
@@ -12,6 +12,9 @@ man_extract <- function(function_name, package = NULL, ...,
     #       extract (correct capitalization necessary)
     #   warn = logical; whether to warn if a field does not exist
     #       for specified function
+    #   silentError = logical; if NO help file found and:
+    #       TRUE = return 'function_name', 'package', 'error' silently
+    #       FALSE = return error message
     
     # test for required packages and install/load, as necessary
     req_pkgs <- c("rvest", "xml2", "magrittr")
@@ -28,10 +31,20 @@ man_extract <- function(function_name, package = NULL, ...,
     # load man page (e.g. help()) as html for desired function
     help_binding <- help(topic = eval(function_name),
                          package = eval(package), ...)
-    if (length(help_binding) < 1 & is.null(package)) {
-        stop(paste0("No documentation for ‘", function_name,
-                    "’ in specified packages and libraries:",
-                    "\n  specify package or other arguments to help()"))
+    if (length(help_binding) < 1) {
+        suggest <- if (is.null(package)) {
+            ";\n  TRY additional arguments to help()"
+            } else { NULL
+            }
+        if (silentError) {
+            return(data.frame(name = function_name, package = pkg_name,
+                          error = paste0("No documentation for in specified ",
+                                         "packages and libraries", suggest)))
+        } else {
+            stop(paste0("No documentation for '", function_name,
+                        "' in specified packages and libraries", suggest,
+                        sep = ""))
+        }
     }
     help_Rd <- utils:::.getHelpFile(help_binding)
     tools::Rd2HTML(help_Rd, out = "temp.html")
