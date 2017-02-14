@@ -1,5 +1,4 @@
-anki_Rcards <- function(packages, ..., warn = FALSE, programmatically = TRUE, 
-                        progress = TRUE) {
+anki_Rcards <- function(packages, ..., progress = TRUE) {
     # Extract man pages for functions from specified packages
     # Arguments:
     #   packages = character vector naming packages
@@ -15,14 +14,15 @@ anki_Rcards <- function(packages, ..., warn = FALSE, programmatically = TRUE,
         
         for (n in functions) {
             content <- lapply(functions$function_name, man_extract, 
-                          package = i, ...)
+                          package = i, programmatically = TRUE, warn = FALSE,
+                          ...)
         }
-        pkg_cards[[i]] <- do.call(rbind, content)
+        pkg_cards[[i]] <- do.call(rbind, content) %>%
+            subset(., !duplicated(.))
         if (progress) {
             message("COMPLETE!")
         }
     }
-    cards <- do.call(rbind, pkg_cards) %>%
-        subset(., !duplicated(.))
+    cards <- do.call(rbind, pkg_cards)
     cards
 }
