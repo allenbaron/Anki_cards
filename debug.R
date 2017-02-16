@@ -6,3 +6,6 @@ for (n in y$function_name) {
     print(n) # prints the last function that worked correctly
 }
 
+# check for name conflicts in tidyverse_content
+y <- tidyverse_content$name[duplicated(tidyverse_content$name)]
+tidyverse_content[tidyverse_content$name %in% y, 1:3]
