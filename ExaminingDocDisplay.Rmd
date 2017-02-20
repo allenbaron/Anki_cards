@@ -1,0 +1,227 @@
+---
+title: "Debugging documentation displayed by help() in R"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
+
+## Steps I took to determine how R displays help files
+
+First, I tried `debugonce("help")` - then ran `help(abbreviate)` and noticed the final lines of code were: 
+    > paths <- unique(paths)
+    > attributes(paths) <- list(call = match.call(), topic = topic, 
+                              tried_all_packages = tried_all_packages,
+                              type = help_type)
+    > class(paths) <- "help_files_with_topic"
+    > paths
+
+So, I assigned the final `paths` variable to the global environment with
+> y <<- paths
+
+Separately, I also tried to bind the help file to a variable:
+```{r}
+t <- help(abbreviate)
+str(t)
+```
+
+The output of both `str(y)` and `str(t)` were the same and if I just typed `y` or `t` it would open the manual for `abbreviate`. So, something about the info in this variable was responsible for opening the help manual.
+
+Next, I selectively removed attributes to determine which are required for the help manual to be opened properly. I then called `str(y)` to confirm they were removed and just tried to autoprint `y`.
+
+```{r eval = FALSE}
+attr(y, "call") <- NULL
+str(y) # help page still opens
+
+attr(y, "topic") <- NULL
+str(y) # help page still opens (I thought this would be essential)
+
+attr(y, "type") <- NULL
+str(y) # help page does NOT open
+
+attr(y, "class") <- NULL
+str(y) # help page does NOT open
+```
+
+Somehow, I started to wonder about the class attribute. I thought it might be the most important factor. So, I started rebuilding `y` from scratch for a different function:
+
+```{r}
+z <- "/Library/Frameworks/R.framework/Resources/library/base/help/acos"
+z # just returns the character vector
+
+class(z) <- "help_files_with_topic"
+z # returns error
+```
+`startDynamicHelp()` was apparently the function being called. I examined it's help documentation and saw that it "starts the internal help server, so that HTML help pages are rendered when requested." I tried calling this function without success and saw that it says in `Details` "startDynamicHelp is called by functions that need to use the server, so would rarely be called directly by a user." More reading led me to examine `getOption("help_type")`. I didn't learn much from that, it's set to html, which I want but I didn't know how to follow up from there.
+
+So, I went back to building the function from scratch. Now I knew I needed the "type" attribute.
+
+```{r}
+attr(z, "type") <- "html"
+z
+```
+
+And I needed the "tried_all_packages" attribute.
+```{r}
+attr(z, "tried_all_packages") <- FALSE
+z
+```
+
+**AND IT WORKED!!!**
+Great.. but now what? Well, I knew I had to figure something out about this class but I wasn't sure how. I tried `??'help_files_with_topic'` to no avail. So, I decided to look at other classes and tried `?character`. I didn't find anything that was super helpful.
+
+At some point I had tried `print(y)` and it opened the manual as expected. So I tried `debug(print)` and `print(y)` to see if I could find something there. All print called was `UseMethod("print")` so I decided to lookup `?UseMethod`.
+
+I've seen a lot about "generic" methods in R but I don't understand too much about them. I know there are S3 and S4 methods but the only other thing I know is S4 are newer and the two types aren't compatible. I noticed in the documentation that it mentioned "methods can be used to find out about the methods for a particular generic function or class."
+
+That got me somewhere.
+
+```{r}
+methods(class = "help_files_with_topic")
+```
+
+AAAAANNNNNDDDDD... I was back to print but with a hint! So, I opened `?methods` and tried:
+```{r}
+methods("print")[111] # subset NOW because it's a long list
+```
+
+And, then I thought I'd try methods on that:
+```{r}
+methods("print.help_files_with_topic")
+```
+
+That didn't get me anywhere but it seems like this is an S3method and at that point I went back to the documentation for `methods` that was still open. At the bottom I noticed `getS3method`. So I lloked that up (`?getS3method`) and then tried:
+
+```{r eval = FALSE}
+getS3method("print", "help_files_with_topic")
+```
+And that brought up _A LOT_ of source code for `print`, which I'm not showing here. Now time for first person... hahaha.
+
+**What does the code do (I'll recreate it as I go through):**
+
+- It sets a `browser` variable and copies the topic and type attributes from the print input (an object 'x' of class "help_files_with_topic") and converts the input to a character vector named `paths`.
+```{r}
+x <- t
+browser <- getOption("browser")
+topic <- attr(x, "topic")
+type <- attr(x, "type")
+paths <- as.character(x)
+```
+
+- It sets the variable `port <- tools::startDynamicHelp(NA)` so that can be opened later.
+```{r}
+port <- tools::startDynamicHelp(NA)
+```
+
+- It sets `file <- paths` (if `length(paths) == 1`).
+```{r}
+file <- paths
+```
+
+- It verifies `type == "html"` and checks if `port > 0L`. Lets look back at `port` and find out what it does:
+```{r}
+port
+port > 0L
+```
+`port` actually opens a port on the computer. This may be useful. I'll probably come back to it. And, the logical expression evaluates to `TRUE` so... 
+
+- It sets a bunch of variables as follows:
+```{r}
+path <- dirname(file)
+dirpath <- dirname(path)
+pkgname <- basename(dirpath)
+
+path
+dirpath
+pkgname
+```
+
+- And then calls `browseURL` as follows:
+```{r}
+browseURL(paste0("http://127.0.0.1:", port, "/library/", 
+                  pkgname, "/html/", basename(file), ".html"), 
+                  browser)
+```
+
+And that opens the help file. Okay, so to get back to what I was working on yesterday I probably just need to call `read_html()` from the `rvest` package using `port` as bound here with `tools::startDynamicHelp(NA)` and it should work. Let's try it.
+
+```{r eval = FALSE}
+library(rvest)
+helpfile <- read_html(paste0("http://127.0.0.1:", port, "/library/", 
+                  pkgname, "/html/", basename(file), ".html"))
+helpfile
+```
+
+Okay, for some reason that stalls. I'm going to look back at my work from 2 days ago and see if I can fix this. I tried just inputing that `port` into where the previous one was in my **Rfunctions_Anki.R** script and it ended up hanging again. Maybe I can wrap `browserURL` in `read_html`.
+
+```{r eval = FALSE}
+helpfile <- read_html(browseURL(paste0("http://127.0.0.1:", port, "/library/", 
+                  pkgname, "/html/", basename(file), ".html"), 
+                  browser))
+```
+
+Nope, that didn't work. It gave me an error.
+
+Maybe my problem is that today I'm opening the wrong kind of port. I wish I could remember how I displayed the help files in Chrome 2 days ago. Back to that...
+
+Okay, I tried opening the "00Index.html" file for `dplyr`. It opens in Chrome but as a file and I can't access the functions listed in it. I also tried dragging that file onto Chrome which had the same effect. I tried right-clicking on the `as.character` link found in the manual for `abbreviate`, copying it and pasting it into Chrome. That gave me the URL in the correct format but I got an "access was denied" error.
+
+Hmmm... I'm going to try `browser` again. Hey, it's a function. Time to try something new:
+```{r}
+browser(paste0("http://127.0.0.1:", port, "/library/",
+               pkgname, "/html/", basename(file), ".html"))
+```
+
+That opened the help file for abbreviate strings. Maybe I can wrap that in `read_html`.
+
+```{r}
+helpfile <- read_html(browser(paste0("http://127.0.0.1:", port, "/library/",
+               pkgname, "/html/", basename(file), ".html")))
+```
+
+Nope, same error. Maybe I can wrap the whole thing in `read_html` (I clearly don't understand what constitutes a "connection"... sheesh). Oh... hahaha. I already tried that. Nevermind. Hmm....
+
+No luck googling "port 11435 computer mac" or "R port computer". Okay, I noticed that if `type == text` `print.help_files_with_topic` does something else. Maybe I can try to specify a type and export all the help files as text files and then delete them afterward. I probably would have to specify this in `help()`. Time to look at `?help`... yep. Okay, let's do this.
+
+```{r}
+help(abbreviate, help_type = "text")
+```
+Hmm.... that opened a new file in RStudio labelled "R Help on 'abbreviate'" but it's blank. Looking back at the S3 print method it looks like that calls
+
+> pkgname <- basename(dirname(dirname(file)))
+> temp <- tools::Rd2txt(.getHelpFile(file), out = tempfile("Rtxt"), 
+                package = pkgname)
+> file.show(temp, title = gettextf("R Help on %s", 
+                sQuote(topic)), delete.file = TRUE)
+
+So, let's see. `?Rd2txt` looks like it's using `.getHelpFile(file)` as the Rd file. It's similar to `Rd2HTML` so maybe I can use that. I can't access any info or run `.getHelpFile` so I'll try binding the `temp` variable as above.
+
+```{r}
+temp <- tools::Rd2txt(.getHelpFile(file), out = tempfile("Rtxt"), 
+                package = pkgname)
+```
+
+Nope. How about googling ".getHelpFile". I found a [webpage](http://r.789695.n4.nabble.com/printing-html-help-to-the-terminal-td2313801.html) that might work. Let's look at what they suggest.
+
+```{r}
+page <- utils:::.getHelpFile(?print) # remember to keep that question mark!), and use 
+tools::Rd2HTML(page) 
+```
+
+SUCCESS!!! Now let's try that for a function I'm familiar with `abbreviate`.
+
+```{r}
+page <- utils:::.getHelpFile(?abbreviate) 
+tools::Rd2HTML(page)
+```
+
+Okay. I'll just extract the pertinent html info I want for Anki and I'll be set!
+
+## Other approaches I attempted/am aware of
+
+1. While I was examining the attributes of `y` I also noticed info suggesting help files were opened with `browseURL()`. I tried using the path "/Library/Frameworks/R.framework/Resources/library/base/help/abbreviate"as an argument but nothing happened. Then, I thought maybe I could change the default browser to some output I could use so I examined `getOption("browser")` but I thought this was a long shot and didn't understand much since it appears to access precompiled code using `.Call` (see `?.Call`).
+
+2. I read online about `R CMD Rdconv` and similar code that could be used at the command line but for some reason I couldn't even get R to open. I learned that had something do with the `$PATH` which I could look up with `echo $PATH` in bash. My path had Python in it but nothing for R. After some internet searching I found [this](http://hathaway.cc/post/69201163472/how-to-edit-your-path-environment-variables-on-mac) and was able to add R to my `$PATH`. Now R commands work. I looked up the help to `R CMD Rdconv` by appending `--help` but the real problem is I can't find the .Rd file. They're probably stored in .rdb (and maybe .rdx) which are binaries.
