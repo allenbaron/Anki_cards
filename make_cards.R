@@ -3,9 +3,9 @@
 # Anki can import html if it is in a plain txt format 
 # anki_dir <- "/Users/jbaron/Library/Application Support/Anki2"
 
-source('~/Documents/DataScience/MyProjects/Anki_cards/man_extract.R')
-source('~/Documents/DataScience/MyProjects/Anki_cards/list_functions.R')
-source('~/Documents/DataScience/MyProjects/Anki_cards/anki_Rcards.R')
+source('man_extract.R')
+source('list_functions.R')
+source('anki_Rcards.R')
 
 # create base set of cards
 base_pkgs <- c("stats", "graphics", "grDevices", "utils", "methods", "base")
